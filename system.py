@@ -12,16 +12,16 @@ from typing import List
 
 import numpy as np
 
+from scipy import linalg
+from scipy import spatial
+
 N_DIMENSIONS = 10
 
 
 def classify(train: np.ndarray, train_labels: np.ndarray, test: np.ndarray) -> List[str]:
     """Classify a set of feature vectors using a training set.
 
-    This dummy implementation simply returns the empty square label ('.')
-    for every input feature vector in the test data.
-
-    Note, this produces a surprisingly high score because most squares are empty.
+    This implementation uses a k-NN classifier, where k = 3.
 
     Args:
         train (np.ndarray): 2-D array storing the training feature vectors.
@@ -31,8 +31,26 @@ def classify(train: np.ndarray, train_labels: np.ndarray, test: np.ndarray) -> L
     Returns:
         list[str]: A list of one-character strings representing the labels for each square.
     """
-    n_images = test.shape[0]
-    return ["."] * n_images
+
+    K = 5
+
+    results = []
+
+    for test_row in test:
+
+        distances = np.sum(np.abs(train - test_row), axis=1)
+        #distances = np.linalg.norm(train - test_row, axis=1)
+        #distances = [spatial.distance.cosine(test_row, train_row) for train_row in train]
+
+        nearest_neighbours = np.argsort(distances)[:K]
+        classes = train_labels[nearest_neighbours]
+
+        unique_classes, counts = np.unique(classes, return_counts=True)
+        max_position = np.argmax(counts)
+
+        results.append(unique_classes[max_position])
+
+    return results
 
 
 # The functions below must all be provided in your solution. Think of them
@@ -58,8 +76,20 @@ def reduce_dimensions(data: np.ndarray, model: dict) -> np.ndarray:
         np.ndarray: The reduced feature vectors.
     """
 
-    reduced_data = data[:, 0:N_DIMENSIONS]
-    return reduced_data
+    N = 10 #number of dimensions
+
+    normalised_data = (data - np.mean(data, axis=0)) / np.std(data, axis=0)
+    cov_matrix = np.cov(normalised_data, rowvar=False)
+    size = cov_matrix.shape[0]
+
+    eigenvalues, eigenvectors = linalg.eigh(cov_matrix, subset_by_index=[size-N, size-1])
+
+    sorted_indices = np.argsort(eigenvalues)[::-1]
+    eigenvectors = eigenvectors[:, sorted_indices]
+
+    pca_data = np.dot(normalised_data, eigenvectors)
+
+    return pca_data
 
 
 def process_training_data(fvectors_train: np.ndarray, labels_train: np.ndarray) -> dict:
@@ -83,6 +113,7 @@ def process_training_data(fvectors_train: np.ndarray, labels_train: np.ndarray) 
     model["labels_train"] = labels_train.tolist()
     fvectors_train_reduced = reduce_dimensions(fvectors_train, model)
     model["fvectors_train"] = fvectors_train_reduced.tolist()
+
     return model
 
 
