@@ -13,7 +13,7 @@ from typing import List
 import numpy as np
 
 from scipy import linalg
-from scipy import spatial
+
 
 N_DIMENSIONS = 10
 
@@ -21,7 +21,7 @@ N_DIMENSIONS = 10
 def classify(train: np.ndarray, train_labels: np.ndarray, test: np.ndarray) -> List[str]:
     """Classify a set of feature vectors using a training set.
 
-    This implementation uses a k-NN classifier, where k = 3.
+    This implementation uses a k-NN classifier, where k = 5.
 
     Args:
         train (np.ndarray): 2-D array storing the training feature vectors.
@@ -32,17 +32,16 @@ def classify(train: np.ndarray, train_labels: np.ndarray, test: np.ndarray) -> L
         list[str]: A list of one-character strings representing the labels for each square.
     """
 
-    K = 5
+    K_NEIGHBOURS = 5
 
     results = []
 
     for test_row in test:
 
-        distances = np.sum(np.abs(train - test_row), axis=1)
-        #distances = np.linalg.norm(train - test_row, axis=1)
-        #distances = [spatial.distance.cosine(test_row, train_row) for train_row in train]
+        #The distance measure used is Euclidean distance
+        distances = np.linalg.norm(train - test_row, axis=1)
 
-        nearest_neighbours = np.argsort(distances)[:K]
+        nearest_neighbours = np.argsort(distances)[:K_NEIGHBOURS]
         classes = train_labels[nearest_neighbours]
 
         unique_classes, counts = np.unique(classes, return_counts=True)
@@ -65,8 +64,7 @@ def classify(train: np.ndarray, train_labels: np.ndarray, test: np.ndarray) -> L
 def reduce_dimensions(data: np.ndarray, model: dict) -> np.ndarray:
     """Reduce the dimensionality of a set of feature vectors down to N_DIMENSIONS.
 
-    The feature vectors are stored in the rows of 2-D array data, (i.e., a data matrix).
-    The dummy implementation below simply returns the first N_DIMENSIONS columns.
+    This implementation uses Principal Component Analysis to reduce the dimensions to 10.
 
     Args:
         data (np.ndarray): The feature vectors to reduce.
@@ -76,18 +74,23 @@ def reduce_dimensions(data: np.ndarray, model: dict) -> np.ndarray:
         np.ndarray: The reduced feature vectors.
     """
 
-    N = 10 #number of dimensions
+    N = 10 #Number of dimensions
 
-    normalised_data = (data - np.mean(data, axis=0)) / np.std(data, axis=0)
+    mean = np.array(np.mean(data, axis=0))
+    normalised_data = (data - mean)
     cov_matrix = np.cov(normalised_data, rowvar=False)
     size = cov_matrix.shape[0]
 
     eigenvalues, eigenvectors = linalg.eigh(cov_matrix, subset_by_index=[size-N, size-1])
 
     sorted_indices = np.argsort(eigenvalues)[::-1]
-    eigenvectors = eigenvectors[:, sorted_indices]
+    eigenvectors = np.array(eigenvectors[:, sorted_indices])
 
     pca_data = np.dot(normalised_data, eigenvectors)
+
+    #The mean and eigenvectors of the data are stored to use when reconstructing the data
+    model["eigenvectors"] = eigenvectors.tolist()
+    model["mean"] = mean.tolist()
 
     return pca_data
 
@@ -95,24 +98,28 @@ def reduce_dimensions(data: np.ndarray, model: dict) -> np.ndarray:
 def process_training_data(fvectors_train: np.ndarray, labels_train: np.ndarray) -> dict:
     """Process the labeled training data and return model parameters stored in a dictionary.
 
-    Note, the contents of the dictionary are up to you, and it can contain any serializable
-    data types stored under any keys. This dictionary will be passed to the classifier.
+    Stores the labels of the training data, the reduced training data, the eigenvectors of 
+    the training data and the mean of the training data in the model for use in reconstructing
+    the data and classifying test data.
 
     Args:
         fvectors_train (np.ndarray): training data feature vectors stored as rows.
         labels_train (np.ndarray): the labels corresponding to the feature vectors.
+        eigenvectors_train (np.ndarray): the Principal Components of the feature vectors.
+        mean_train (np.ndarray): the mean of the feature vectors.
 
     Returns:
         dict: a dictionary storing the model data.
     """
 
-    # The design of this is entirely up to you.
-    # Note, if you are using an instance based approach, e.g. a nearest neighbour,
-    # then the model will need to store the dimensionally-reduced training data and labels.
     model = {}
+
     model["labels_train"] = labels_train.tolist()
     fvectors_train_reduced = reduce_dimensions(fvectors_train, model)
     model["fvectors_train"] = fvectors_train_reduced.tolist()
+
+    model["eigenvectors_train"] = model["eigenvectors"]
+    model["mean_train"] = model["mean"]
 
     return model
 
@@ -140,9 +147,8 @@ def images_to_feature_vectors(images: List[np.ndarray]) -> np.ndarray:
 def classify_squares(fvectors_test: np.ndarray, model: dict) -> List[str]:
     """Run classifier on a array of image feature vectors presented in an arbitrary order.
 
-    Note, the feature vectors stored in the rows of fvectors_test represent squares
-    to be classified. The ordering of the feature vectors is arbitrary, i.e., no information
-    about the position of the squares within the board is available.
+    Takes all the necessary data from the model, reconstructs the reduced data and runs the 
+    classifier on the array of images (feature vectors).
 
     Args:
         fvectors_test (np.ndarray): An array in which feature vectors are stored as rows.
@@ -152,12 +158,20 @@ def classify_squares(fvectors_test: np.ndarray, model: dict) -> List[str]:
         list[str]: A list of one-character strings representing the labels for each square.
     """
 
-    # Get some data out of the model. It's up to you what you've stored in here
     fvectors_train = np.array(model["fvectors_train"])
     labels_train = np.array(model["labels_train"])
 
-    # Call the classify function.
-    labels = classify(fvectors_train, labels_train, fvectors_test)
+    train_vectors = np.array(model["eigenvectors_train"])
+    train_mean = np.array(model["mean_train"])
+
+    test_vectors = np.array(model["eigenvectors"])
+    test_mean = np.array(model["mean"])
+
+    #Reconstructs the reduced data 
+    train_data = np.dot(fvectors_train, train_vectors.T) + train_mean
+    test_data = np.dot(fvectors_test, test_vectors.T) + test_mean
+
+    labels = classify(train_data, labels_train, test_data)
 
     return labels
 
