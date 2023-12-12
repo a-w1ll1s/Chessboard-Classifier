@@ -32,7 +32,7 @@ def classify(train: np.ndarray, train_labels: np.ndarray, test: np.ndarray) -> L
         list[str]: A list of one-character strings representing the labels for each square.
     """
     
-    K_NEIGHBOURS = 7
+    K_NEIGHBOURS = 10
     results = []
 
     #Calculate distance measure matrix - Euclidean distance is implemented here
