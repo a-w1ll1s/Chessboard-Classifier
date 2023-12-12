@@ -6,18 +6,44 @@ the parsing to fail.]
 
 ## Feature Extraction (Max 200 Words)
 
-[Describe and justify the design of your feature extraction. Note, feature extraction 
-includes all the steps that you have taken to produce the 20-dimensional feature vector
-starting from the initial image of the puzzle.]
+Firstly, the images are transformed into feature vectors where one pixel in the image 
+corresponds to one feature in the vector. This is important as it allows us to represent
+the images numerically, which is necessary when working in data-driven computing. Next, 
+the dimensionality of these feature vectors is reduced to 10 features using Principal 
+Component Analysis. PCA reduces the dimensionality of the feature vectors by finding the 
+10 largest principal components and mapping the feature vectors to these principal 
+components. PCA was a good dimensionality reduction strategy for this project because the
+images contained lots of highly correlated features (pixels) which allowed PCA to maintain
+the majority of the feature vector information in only 10 components/dimensions. This is 
+because the correlation between the features meant that the variances could be attributed 
+to a small number of the most important principal components. Finally, the reduced data 
+is stored along with its principal components and mean vector. 
 
 ## Square Classifier (Max 200 Words)
 
-[Describe and justify the design of your classifier and any associated classifier training
-stage.]
+The reduced training and testing data are reconstructed using the stored principal 
+components and mean vectors. Then, a k-NN classifier takes the training data, test data 
+and training labels and calculates the distance matrix between the training feature vectors
+and the test feature vectors using the Euclidean distance formula. For each test feature 
+vector, the k nearest neighbours are found according to the distance matrix and the most 
+common label out of the neighbours is given to the test feature vector. I implemented a 
+k-NN classifier for this project because of the k hyperparameter. It allows you to choose 
+how many neighbours are taken into account when classifying a feature vector which means 
+the best results can be found through experimenting with this hyperparameter. On top of this, 
+k-NN classifiers are supervised, therefore they do not have a training phase, making them 
+simple to implement and fairly time-efficient. 
 
 ## Full-board Classification (Max 200 Words)
 
-[Describe the approach that you have taken for classifying the full board.]
+For the full board classification, the test feature vectors are given in board order. This 
+allows for more context to be given which opens more avenues for classification strategies. 
+I decided to split the training and test data into the feature vectors that represent white 
+squares on the board and feature vectors that represent the black squares. This allowed me 
+to run the classifier on the black and white squares independently. This strategy should 
+improve the classification score as removing almost half of the classification labels 
+increases the relative number of correct labels that appear in the k-nearest neighbours. It 
+also means that means that the will be a drop in incorrect classifications between white and 
+black squares. 
 
 ## Performance
 
@@ -25,15 +51,14 @@ My percentage correctness scores (to 1 decimal place) for the development data a
 
 High quality data:
 
-- Percentage Squares Correct: [Insert percentage here, e.g. 98.1% - remove brackets]
-- Percentage Boards Correct: [Insert percentage here, e.g. 98.0% - remove brackets]
+- Percentage Squares Correct: 97.1%
+- Percentage Boards Correct: 95.9%
 
 Noisy data:
 
-- Percentage Squares Correct: [Insert percentage here, e.g. 83.3% - remove brackets]
-- Percentage Boards Correct: [Insert percentage here, e.g. 58.1% - remove brackets]
+- Percentage Squares Correct: 90.3%
+- Percentage Boards Correct: 91.2%
 
 ## Other information (Optional, Max 100 words)
 
-[Optional: highlight any significant aspects of your system that are NOT covered in the
-sections above]
+N/A
