@@ -31,19 +31,22 @@ def classify(train: np.ndarray, train_labels: np.ndarray, test: np.ndarray) -> L
     Returns:
         list[str]: A list of one-character strings representing the labels for each square.
     """
-
-    K_NEIGHBOURS = 5
-
+    
+    K_NEIGHBOURS = 7
     results = []
 
-    for test_row in test:
+    #Calculate distance measure matrix - Euclidean distance is implemented here
+    train_squared = np.sum(np.square(train), axis=1)
+    test_squared = np.sum(np.square(test), axis=1)
+    dot_product = np.dot(test, train.T)
+    distances = np.sqrt(test_squared[:, None] - 2 * dot_product + train_squared)
+    
+    for i in range(distances.shape[0]):
+        #Find k-nearest neighbours
+        nearest_neighbours = np.argsort(distances[i])[:K_NEIGHBOURS]
 
-        #The distance measure used is Euclidean distance
-        distances = np.linalg.norm(train - test_row, axis=1)
-
-        nearest_neighbours = np.argsort(distances)[:K_NEIGHBOURS]
+        #Calculate the class
         classes = train_labels[nearest_neighbours]
-
         unique_classes, counts = np.unique(classes, return_counts=True)
         max_position = np.argmax(counts)
 
@@ -168,9 +171,10 @@ def classify_squares(fvectors_test: np.ndarray, model: dict) -> List[str]:
     test_mean = np.array(model["mean"])
 
     #Reconstructs the reduced data 
-    train_data = np.dot(fvectors_train, train_vectors.T) + train_mean
-    test_data = np.dot(fvectors_test, test_vectors.T) + test_mean
+    train_data = np.array(np.dot(fvectors_train, train_vectors.T) + train_mean)
+    test_data = np.array(np.dot(fvectors_test, test_vectors.T) + test_mean)
 
+    #Classify the data
     labels = classify(train_data, labels_train, test_data)
 
     return labels
@@ -179,12 +183,9 @@ def classify_squares(fvectors_test: np.ndarray, model: dict) -> List[str]:
 def classify_boards(fvectors_test: np.ndarray, model: dict) -> List[str]:
     """Run classifier on a array of image feature vectors presented in 'board order'.
 
-    The feature vectors for each square are guaranteed to be in 'board order', i.e.
-    you can infer the position on the board from the position of the feature vector
-    in the feature vector array.
-
-    In the dummy code below, we just re-use the simple classify_squares function,
-    i.e. we ignore the ordering.
+    Takes all the necessary data from the model and reconstructs the reduced data. 
+    It then splits the training data, labels and test data into black or white squares
+    and classifies them independently. 
 
     Args:
         fvectors_test (np.ndarray): An array in which feature vectors are stored as rows.
@@ -194,4 +195,37 @@ def classify_boards(fvectors_test: np.ndarray, model: dict) -> List[str]:
         list[str]: A list of one-character strings representing the labels for each square.
     """
 
-    return classify_squares(fvectors_test, model)
+    fvectors_train = np.array(model["fvectors_train"])
+    labels_train = np.array(model["labels_train"])
+
+    train_vectors = np.array(model["eigenvectors_train"])
+    train_mean = np.array(model["mean_train"])
+
+    test_vectors = np.array(model["eigenvectors"])
+    test_mean = np.array(model["mean"])
+
+    #Reconstructs the reduced data 
+    train_data = np.dot(fvectors_train, train_vectors.T) + train_mean
+    test_data = np.dot(fvectors_test, test_vectors.T) + test_mean
+
+    #Split the training data and labels into black and white squares
+    white_squares = np.array(train_data[0::2,:])
+    white_labels = np.array(labels_train[0::2])
+
+    black_squares = np.array(train_data[1::2,:])
+    black_labels = np.array(labels_train[1::2])
+
+    #Split the test data into black and white squares
+    white_tests = np.array(test_data[0::2,:])
+    black_tests = np.array(test_data[1::2,:])
+
+    #Classify the black and white squares independently
+    white_results = classify(white_squares, white_labels, white_tests)
+    black_results = classify(black_squares, black_labels, black_tests)
+
+    results = [None] * (len(white_results) + len(black_results))
+    results[0::2],results[1::2] = white_results, black_results
+
+    return results
+
+    
